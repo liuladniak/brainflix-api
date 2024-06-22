@@ -1,19 +1,50 @@
 import express from "express";
 import fs from "fs";
 import crypto from "crypto";
-
+import path from "path";
+import multer from "multer";
 const router = express.Router();
+import slugify from "slugify";
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "./public/videos");
+  },
+  filename: function (req, file, cb) {
+    const timestamp = Date.now();
+    const originalName = path.parse(file.originalname).name;
+    const extension = path.extname(file.originalname);
+    const slug = slugify(originalName, { lower: true });
+    cb(null, `${timestamp}-${slug}${extension}`);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedMimeTypes = ["video/mp4", "video/mkv", "video/webm"];
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Invalid file type. Only video files are allowed."), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+const videoFilePath = "./data/videos.json";
 
 const readVideoFile = () => {
-  const videoFile = fs.readFileSync("./data/videos.json");
+  const videoFile = fs.readFileSync(videoFilePath);
   const videoData = JSON.parse(videoFile);
-
   return videoData;
 };
 
 const writeVideoFile = (data) => {
   const strigifiedData = JSON.stringify(data);
-  fs.writeFileSync("./data/videos.json", strigifiedData);
+  fs.writeFileSync(videoFilePath, strigifiedData);
 };
 
 router.get("/", (req, res) => {
@@ -44,12 +75,24 @@ router.get("/:id", (req, res) => {
   }
 });
 
-router.post("/", (req, res) => {
+router.post("/", upload.single("video"), (req, res) => {
+  if (!req.body.title || !req.body.description || !req.file) {
+    return res.status(400).json({
+      message: "Title, description and video file are required.",
+    });
+  }
   const newVideo = {
     id: crypto.randomUUID(),
     title: req.body.title,
     channel: req.body.channel,
+    description: req.body.description,
     image: req.body.image,
+    video: `/videos/${req.file.filename}`,
+    views: "0",
+    likes: "0",
+    duration: "0:00",
+    timestamp: Date.now(),
+    comments: [],
   };
 
   const videoData = readVideoFile();
