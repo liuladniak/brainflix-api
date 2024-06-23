@@ -25,6 +25,16 @@ app.get("/", (req, res) => {
 
 app.use("/videos", videosRouter);
 
+app.use((err, req, res, next) => {
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ message: "File size exceeds limit." });
+  } else if (err.code === "INVALID_FILE_TYPE") {
+    return res.status(400).json({ message: err.message });
+  } else {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`App is running on port ${PORT}`);
 });

@@ -24,7 +24,11 @@ const fileFilter = (req, file, cb) => {
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Invalid file type. Only video files are allowed."), false);
+    const error = new Error(
+      "Invalid file type. Only MP4, MKV, and WEBM video files are allowed."
+    );
+    error.code = "INVALID_FILE_TYPE";
+    cb(error);
   }
 };
 
@@ -76,11 +80,18 @@ router.get("/:id", (req, res) => {
 });
 
 router.post("/", upload.single("video"), (req, res) => {
-  if (!req.body.title || !req.body.description || !req.file) {
+  if (req.fileValidationError) {
+    return res.status(400).json({ message: req.fileValidationError });
+  }
+  if (!req.file) {
+    return res.status(400).json({ message: "Please upload a video file." });
+  }
+  if (!req.body.title || !req.body.description) {
     return res.status(400).json({
-      message: "Title, description and video file are required.",
+      message: "Title and description are required.",
     });
   }
+
   const newVideo = {
     id: crypto.randomUUID(),
     title: req.body.title,
@@ -102,4 +113,5 @@ router.post("/", upload.single("video"), (req, res) => {
 
   res.status(201).json(newVideo);
 });
+
 export default router;
